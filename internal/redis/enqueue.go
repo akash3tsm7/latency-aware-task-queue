@@ -10,24 +10,41 @@ import (
 )
 
 func EnqueueJob(ctx context.Context, rdb *redis.Client, job models.Job) error {
+	// 1. Store job payload
 	jobKey := fmt.Sprintf("job:%s", job.ID)
-
 	data, err := json.Marshal(job)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal job: %w", err)
 	}
 
-	if err := rdb.HSet(ctx, jobKey, "payload", data).Err(); err != nil {
-		return err
+	err = rdb.HSet(ctx, jobKey, map[string]interface{}{
+		"payload":    string(data),
+		"created_at": fmt.Sprintf("%d", job.Metadata),
+		"status":     "queued",
+	}).Err()
+	
+	if err != nil {
+		return fmt.Errorf("failed to store job data: %w", err)
 	}
 
+	// 2. Add to appropriate queue based on requirements
 	queue := "queue:any"
 	if job.Requires == "cpu" || job.Requires == "gpu" {
 		queue = fmt.Sprintf("queue:%s", job.Requires)
 	}
 
-	return rdb.ZAdd(ctx, queue, redis.Z{
-		Score:  float64(job.Priority),
+	// Use negative priority for max-heap behavior (ZPopMax gets highest score)
+	// Higher priority jobs should have higher (less negative) scores
+	score := float64(-job.Priority)
+
+	err = rdb.ZAdd(ctx, queue, redis.Z{
+		Score:  score,
 		Member: job.ID,
 	}).Err()
+	
+	if err != nil {
+		return fmt.Errorf("failed to add job to queue: %w", err)
+	}
+
+	return nil
 }

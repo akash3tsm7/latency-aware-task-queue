@@ -16,38 +16,69 @@ func FetchAndClaimJob(
 	worker models.Worker,
 ) (*models.Job, error) {
 
-	queueKey := fmt.Sprintf("queue:%s", worker.Type)
+	// Define queue priority order for this worker
+	// 1. Worker-type specific queue (cpu/gpu)
+	// 2. Generic "any" queue
+	queues := []string{
+		fmt.Sprintf("queue:%s", worker.Type),
+		"queue:any",
+	}
 
-	// Atomically pop highest priority job
-	zres, err := rdb.ZPopMax(ctx, queueKey, 1).Result()
-	if err != nil || len(zres) == 0 {
+	var jobID string
+	var foundQueue string
+
+	// Try each queue in priority order
+	for _, queueKey := range queues {
+		// Atomically pop highest priority job (highest score = least negative)
+		zres, err := rdb.ZPopMax(ctx, queueKey, 1).Result()
+		
+		if err != nil && err != redis.Nil {
+			return nil, fmt.Errorf("failed to pop from queue %s: %w", queueKey, err)
+		}
+		
+		if len(zres) > 0 {
+			jobID = zres[0].Member.(string)
+			foundQueue = queueKey
+			break
+		}
+	}
+
+	// No job found in any queue
+	if jobID == "" {
 		return nil, nil
 	}
 
-	jobID := zres[0].Member.(string)
-	jobKey := fmt.Sprintf("job:%s", jobID)
-
 	// Fetch job payload
+	jobKey := fmt.Sprintf("job:%s", jobID)
 	raw, err := rdb.HGet(ctx, jobKey, "payload").Result()
-	if err != nil {
-		return nil, err
+	
+	if err == redis.Nil {
+		// Job data was deleted - skip this job
+		return nil, fmt.Errorf("job %s data not found", jobID)
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to fetch job data: %w", err)
 	}
 
 	var job models.Job
 	if err := json.Unmarshal([]byte(raw), &job); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal job: %w", err)
 	}
 
 	// Mark as running
 	runningKey := fmt.Sprintf("running:%s", worker.ID)
-	if err := rdb.HSet(
-		ctx,
-		runningKey,
-		job.ID,
-		time.Now().Unix(),
-	).Err(); err != nil {
-		return nil, err
+	err = rdb.HSet(ctx, runningKey, job.ID, time.Now().Unix()).Err()
+	
+	if err != nil {
+		// If we can't mark it as running, requeue it
+		rdb.ZAdd(ctx, foundQueue, redis.Z{
+			Score:  float64(-job.Priority),
+			Member: job.ID,
+		})
+		return nil, fmt.Errorf("failed to mark job as running: %w", err)
 	}
+
+	// Update job status
+	rdb.HSet(ctx, jobKey, "status", "running")
 
 	return &job, nil
 }
