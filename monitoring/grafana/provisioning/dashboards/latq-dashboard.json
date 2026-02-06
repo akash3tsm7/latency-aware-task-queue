@@ -1,0 +1,204 @@
+{
+    "dashboard": {
+        "title": "Latency-Aware Task Queue",
+        "uid": "latq-main",
+        "timezone": "browser",
+        "schemaVersion": 36,
+        "version": 1,
+        "refresh": "10s",
+        "panels": [
+            {
+                "id": 1,
+                "title": "Queue Length by Type",
+                "type": "timeseries",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 0
+                },
+                "targets": [
+                    {
+                        "expr": "latq_queue_length",
+                        "legendFormat": "{{queue_type}}",
+                        "refId": "A"
+                    }
+                ],
+                "options": {
+                    "legend": {
+                        "displayMode": "list",
+                        "placement": "bottom"
+                    }
+                }
+            },
+            {
+                "id": 2,
+                "title": "Job Completion Rate",
+                "type": "timeseries",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 0
+                },
+                "targets": [
+                    {
+                        "expr": "rate(latq_jobs_completed_total[1m])",
+                        "legendFormat": "{{queue_type}}-{{worker_type}}-{{success}}",
+                        "refId": "A"
+                    }
+                ]
+            },
+            {
+                "id": 3,
+                "title": "Job Duration p50/p95/p99",
+                "type": "timeseries",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 8
+                },
+                "targets": [
+                    {
+                        "expr": "histogram_quantile(0.50, sum(rate(latq_job_duration_seconds_bucket[5m])) by (le, queue_type))",
+                        "legendFormat": "p50 - {{queue_type}}",
+                        "refId": "A"
+                    },
+                    {
+                        "expr": "histogram_quantile(0.95, sum(rate(latq_job_duration_seconds_bucket[5m])) by (le, queue_type))",
+                        "legendFormat": "p95 - {{queue_type}}",
+                        "refId": "B"
+                    },
+                    {
+                        "expr": "histogram_quantile(0.99, sum(rate(latq_job_duration_seconds_bucket[5m])) by (le, queue_type))",
+                        "legendFormat": "p99 - {{queue_type}}",
+                        "refId": "C"
+                    }
+                ]
+            },
+            {
+                "id": 4,
+                "title": "Worker Statistics",
+                "type": "stat",
+                "gridPos": {
+                    "h": 8,
+                    "w": 6,
+                    "x": 12,
+                    "y": 8
+                },
+                "targets": [
+                    {
+                        "expr": "latq_workers_registered",
+                        "refId": "A"
+                    }
+                ],
+                "options": {
+                    "colorMode": "value",
+                    "graphMode": "area",
+                    "textMode": "auto"
+                },
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "short",
+                        "displayName": "Registered Workers"
+                    }
+                }
+            },
+            {
+                "id": 5,
+                "title": "Running Jobs",
+                "type": "stat",
+                "gridPos": {
+                    "h": 8,
+                    "w": 6,
+                    "x": 18,
+                    "y": 8
+                },
+                "targets": [
+                    {
+                        "expr": "latq_running_jobs_total",
+                        "refId": "A"
+                    }
+                ],
+                "options": {
+                    "colorMode": "value",
+                    "graphMode": "area"
+                },
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "short",
+                        "displayName": "Running Jobs"
+                    }
+                }
+            },
+            {
+                "id": 6,
+                "title": "Jobs Submitted",
+                "type": "timeseries",
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 16
+                },
+                "targets": [
+                    {
+                        "expr": "rate(latq_jobs_submitted_total[1m])",
+                        "legendFormat": "{{queue_type}}",
+                        "refId": "A"
+                    }
+                ]
+            },
+            {
+                "id": 7,
+                "title": "Recovery Events",
+                "type": "stat",
+                "gridPos": {
+                    "h": 8,
+                    "w": 6,
+                    "x": 12,
+                    "y": 16
+                },
+                "targets": [
+                    {
+                        "expr": "latq_recovery_events_total",
+                        "refId": "A"
+                    }
+                ],
+                "options": {
+                    "colorMode": "value"
+                },
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "short",
+                        "displayName": "Total Recoveries"
+                    }
+                }
+            },
+            {
+                "id": 8,
+                "title": "Requeued Jobs",
+                "type": "stat",
+                "gridPos": {
+                    "h": 8,
+                    "w": 6,
+                    "x": 18,
+                    "y": 16
+                },
+                "targets": [
+                    {
+                        "expr": "latq_jobs_requeued_total",
+                        "refId": "A"
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "unit": "short",
+                        "displayName": "Requeued"
+                    }
+                }
+            }
+        ]
+    }
+}

@@ -1,0 +1,48 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'latency-aware-task-queue'
+    environment: 'development'
+
+# Alertmanager configuration (optional, can be added later)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Load rules once and periodically evaluate them
+# rule_files:
+#   - "alerts/*.yml"
+
+scrape_configs:
+  # Scheduler metrics
+  - job_name: 'scheduler'
+    static_configs:
+      - targets: ['host.docker.internal:2112']
+        labels:
+          service: 'scheduler'
+          component: 'task-queue'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Worker metrics (supports multiple workers on different ports)
+  - job_name: 'workers'
+    static_configs:
+      - targets: 
+          - 'host.docker.internal:2113'  # Worker 1
+          # - 'host.docker.internal:2114'  # Worker 2 (if needed)
+          # - 'host.docker.internal:2115'  # Worker 3 (if needed)
+        labels:
+          service: 'worker'
+          component: 'task-queue'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          component: 'monitoring'

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/ak3tsm7/latency-aware-task-queue/internal/metrics"
 )
 
 const (
@@ -82,6 +83,9 @@ func recoverStuckJobs(ctx context.Context, rdb *redis.Client) {
 					fmt.Printf("  ❌ Failed to requeue job %s: %v\n", jobID, err)
 				} else {
 					recoveredCount++
+					// Increment recovery metrics
+					metrics.RecoveryEventsTotal.Inc()
+					metrics.JobsRequeuedTotal.Inc()
 				}
 			}
 
@@ -90,13 +94,13 @@ func recoverStuckJobs(ctx context.Context, rdb *redis.Client) {
 			rdb.Del(ctx, hbKey)
 			rdb.ZRem(ctx, "workers:latency", workerID)
 			
-			fmt.Printf("✓ Cleaned up worker %s\n", workerID)
+			fmt.Printf("✅ Cleaned up worker %s\n", workerID)
 		}
 	}
 
 	if recoveredCount > 0 {
-		fmt.Printf("✓ Recovery complete: %d jobs recovered\n", recoveredCount)
+		fmt.Printf("✅ Recovery complete: %d jobs recovered\n", recoveredCount)
 	} else {
-		fmt.Println("✓ No stuck jobs found")
+		fmt.Println("✅ No stuck jobs found")
 	}
 }

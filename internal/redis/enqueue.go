@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/ak3tsm7/latency-aware-task-queue/internal/models"
 )
+
 
 func EnqueueJob(ctx context.Context, rdb *redis.Client, job models.Job) error {
 	// 1. Store job payload
@@ -17,11 +19,18 @@ func EnqueueJob(ctx context.Context, rdb *redis.Client, job models.Job) error {
 		return fmt.Errorf("failed to marshal job: %w", err)
 	}
 
+	metadataJSON, err := json.Marshal(job.Metadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
 	err = rdb.HSet(ctx, jobKey, map[string]interface{}{
-		"payload":    string(data),
-		"created_at": fmt.Sprintf("%d", job.Metadata),
-		"status":     "queued",
+		"payload":     string(data),
+		"metadata":    string(metadataJSON),
+	"status":      "queued",
+	"created_at":  time.Now().Unix(),
 	}).Err()
+
 	
 	if err != nil {
 		return fmt.Errorf("failed to store job data: %w", err)

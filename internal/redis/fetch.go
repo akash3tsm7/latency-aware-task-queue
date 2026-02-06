@@ -51,16 +51,18 @@ func FetchAndClaimJob(
 	// Fetch job payload
 	jobKey := fmt.Sprintf("job:%s", jobID)
 	raw, err := rdb.HGet(ctx, jobKey, "payload").Result()
-	
-	if err == redis.Nil {
-		// Job data was deleted - skip this job
-		return nil, fmt.Errorf("job %s data not found", jobID)
+
+	if err == redis.Nil || raw == "" {
+		_ = MoveToDLQInvalidPayload(ctx, rdb, jobID, raw, fmt.Errorf("missing payload"))
+		return nil, fmt.Errorf("job %s payload missing", jobID)
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to fetch job data: %w", err)
 	}
 
 	var job models.Job
 	if err := json.Unmarshal([]byte(raw), &job); err != nil {
+		// Payload is corrupted/invalid JSON. Move to DLQ so workers don't loop forever.
+		_ = MoveToDLQInvalidPayload(ctx, rdb, jobID, raw, err)
 		return nil, fmt.Errorf("failed to unmarshal job: %w", err)
 	}
 
