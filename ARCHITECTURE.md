@@ -4,33 +4,33 @@ Architecture Overview
 ```mermaid
 flowchart LR
     Client[Job submitter] -->|HTTP/SDK| Scheduler
-    Scheduler -->|enqueue job (job:<id> + queue:*)| Redis[(Redis broker)]
+    Scheduler -->|enqueue job| Redis[(Redis broker)]
 
     subgraph Broker
-      Redis -->|retry:scheduled| Redis
-      Redis -->|dlq:failed / dlq:job:*| Redis
+      Redis -->|retry scheduled| Redis
+      Redis -->|dlq failed + metadata| Redis
     end
 
-    Redis -->|claim| WorkerCPU[Worker (cpu)]
-    Redis -->|claim| WorkerGPU[Worker (gpu)]
+    Redis -->|claim| WorkerCPU[Worker (CPU)]
+    Redis -->|claim| WorkerGPU[Worker (GPU)]
     Redis -->|claim| WorkerAny[Worker (any)]
 
-    WorkerCPU -->|running:* + heartbeat| Redis
-    WorkerGPU -->|running:* + heartbeat| Redis
-    WorkerAny -->|running:* + heartbeat| Redis
+    WorkerCPU -->|running marker + heartbeat| Redis
+    WorkerGPU -->|running marker + heartbeat| Redis
+    WorkerAny -->|running marker + heartbeat| Redis
 
     WorkerCPU -->|success| Redis
     WorkerGPU -->|success| Redis
     WorkerAny -->|success| Redis
 
-    WorkerCPU -->|fail -> retry:scheduled| Redis
-    WorkerGPU -->|fail -> retry:scheduled| Redis
-    WorkerAny -->|fail -> retry:scheduled| Redis
+    WorkerCPU -->|fail -> retry bucket| Redis
+    WorkerGPU -->|fail -> retry bucket| Redis
+    WorkerAny -->|fail -> retry bucket| Redis
 
     Scheduler -->|promote due retries| Redis
     Scheduler -->|recover stuck jobs| Redis
-    API[/DELETE /api/jobs/{id}/cancel/] --> Scheduler
-    Scheduler -->|set cancelled:<id>| Redis
+    CancelAPI[/Cancel job endpoint/] --> Scheduler
+    Scheduler -->|set cancelled flag| Redis
 ```
 
 Flow (happy path)
