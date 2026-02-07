@@ -37,3 +37,6 @@ If `max_retries` is `0`, the system defaults to `3`.
 - Environment: 40 workers (RATE_LIMIT_PER_MINUTE=100000), scheduler running, Redis local.
 - Results: throughput 8.58 jobs/sec; latency p50/p95/p99 (ms): 157238 / 226262 / 232307; success 2000; failed 0; cancelled 0; dlq 0; duration 233.04 s.
 See `BENCHMARKS.md` for details.
+
+## Architecture
+See `ARCHITECTURE.md` for the diagram and flow. Briefly: Scheduler accepts jobs, writes `job:<id>` + queues; workers claim from `queue:*`, track `running:*` + `heartbeat:*`, enforce timeout/cancel, retry with backoff into `retry:scheduled`, and push exhausted jobs to `dlq:failed`/`dlq:job:*`. Scheduler promotes due retries and exposes cancel API; rate limiting and per-worker latency tracking run via Redis keys; metrics are exposed via Prometheus endpoints on scheduler (`:2112`) and workers (`:2113`).
