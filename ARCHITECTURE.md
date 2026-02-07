@@ -4,32 +4,31 @@ Architecture Overview
 ```mermaid
 flowchart LR
     Client[Job submitter] -->|HTTP/SDK| Scheduler
-    Scheduler -->|HSET job:* + ZADD queue:*| Redis[(Redis Broker)]
+    Scheduler -->|enqueue job (job:<id> + queue:*)| Redis[(Redis broker)]
 
     subgraph Broker
-      Redis
       Redis -->|retry:scheduled| Redis
       Redis -->|dlq:failed / dlq:job:*| Redis
     end
 
-    Redis -->|Fetch & claim| WorkerCPU[Worker (cpu)]
-    Redis -->|Fetch & claim| WorkerGPU[Worker (gpu)]
-    Redis -->|Fetch & claim| WorkerAny[Worker (any)]
+    Redis -->|claim| WorkerCPU[Worker (cpu)]
+    Redis -->|claim| WorkerGPU[Worker (gpu)]
+    Redis -->|claim| WorkerAny[Worker (any)]
 
     WorkerCPU -->|running:* + heartbeat| Redis
     WorkerGPU -->|running:* + heartbeat| Redis
     WorkerAny -->|running:* + heartbeat| Redis
 
-    WorkerCPU -->|success -> delete job| Redis
-    WorkerGPU -->|success -> delete job| Redis
-    WorkerAny -->|success -> delete job| Redis
+    WorkerCPU -->|success| Redis
+    WorkerGPU -->|success| Redis
+    WorkerAny -->|success| Redis
 
-    WorkerCPU -->|failure -> retry:scheduled| Redis
-    WorkerGPU -->|failure -> retry:scheduled| Redis
-    WorkerAny -->|failure -> retry:scheduled| Redis
+    WorkerCPU -->|fail -> retry:scheduled| Redis
+    WorkerGPU -->|fail -> retry:scheduled| Redis
+    WorkerAny -->|fail -> retry:scheduled| Redis
 
-    Scheduler -->|Promote due retries| Redis
-    Scheduler -->|Recovery requeues stuck| Redis
+    Scheduler -->|promote due retries| Redis
+    Scheduler -->|recover stuck jobs| Redis
     API[/DELETE /api/jobs/{id}/cancel/] --> Scheduler
     Scheduler -->|set cancelled:<id>| Redis
 ```
