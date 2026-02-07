@@ -161,8 +161,11 @@ func main() {
 			execErr = errJobCancelled
 		}
 
-		if v, ok := job.Payload["should_fail"].(bool); ok && v {
-			execErr = errors.New("simulated job failure (payload.should_fail=true)")
+		// Only apply simulated failure if the job did not already timeout/cancel.
+		if execErr == nil {
+			if v, ok := job.Payload["should_fail"].(bool); ok && v {
+				execErr = errors.New("simulated job failure (payload.should_fail=true)")
+			}
 		}
 
 		duration := time.Since(start)
