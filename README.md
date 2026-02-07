@@ -23,3 +23,11 @@ If `max_retries` is `0`, the system defaults to `3`.
   - schedule a retry into `retry:scheduled`, or
   - move the job into `dlq:failed` and write `dlq:job:<id>`.
 - Scheduler runs `PromoteDueRetries(...)` and moves due jobs back into `queue:*` for workers to pick up.
+
+## Load / Benchmark Tool
+- Run the benchmark utility to enqueue a batch and measure drain time:
+  ```
+  go run ./cmd/bench -jobs 200 -concurrency 20 -queue cpu -timeout 3000
+  ```
+- Env overrides: `REDIS_ADDR`, `BENCH_JOBS`, `BENCH_CONCURRENCY`, `BENCH_QUEUE`, `BENCH_TIMEOUT_MS`, `BENCH_FAIL` (bool), `BENCH_PAYLOAD_BYTES` (int).
+- Output shows remaining/running/queued/dlq counts until all benchmark jobs finish. Use alongside running workers for load testing.
